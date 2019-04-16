@@ -8,8 +8,14 @@ from app import appbuilder, db
 from flask_appbuilder import AppBuilder, expose, BaseView, has_access
 from app import appbuilder
 
-from flask_appbuilder import AppBuilder, BaseView, expose, has_access
-from app import appbuilder
+from flask_appbuilder import SimpleFormView
+from flask_babel import lazy_gettext as _
+from .forms import MyForm
+
+from flask_appbuilder import ModelView, MultipleView, MasterDetailView
+from flask_appbuilder.models.sqla.interface import SQLAInterface
+from .models import ContactGroup, Contact
+
 
 
 class MyView(BaseView):
@@ -41,15 +47,6 @@ class MyView(BaseView):
         return self.render_template('method3.html',
                                param1 = param1)
 
-appbuilder.add_view(MyView, "Method1", category='My View')
-appbuilder.add_link("Method2", href='/myview/method2/john', category='My View')
-appbuilder.add_link("Method3", href='/myview/method3/john', category='My View')
-
-from flask_appbuilder import SimpleFormView
-from flask_babel import lazy_gettext as _
-from .forms import MyForm
-
-
 
 class MyFormView(SimpleFormView):
     form = MyForm
@@ -63,28 +60,62 @@ class MyFormView(SimpleFormView):
         # post process form
         flash(self.message, 'info')
 
+
+
+class ContactModelView(ModelView):
+    datamodel = SQLAInterface(Contact)
+
+    label_columns = {'contact_group':'Contacts Group'}
+    list_columns = ['name','personal_cellphone','birthday','contact_group']
+
+    show_fieldsets = [
+                        (
+                            'Summary',
+                            {'fields':['name','address','contact_group']}
+                        ),
+                        (
+                            'Personal Info',
+                            {'fields':['birthday','personal_phone','personal_cellphone'],'expanded':False}
+                        ),
+                     ]
+
+class GroupModelView(ModelView):
+    datamodel = SQLAInterface(ContactGroup)
+    related_views = [ContactModelView]
+
+class MultipleViewExp(MultipleView):
+    views = [GroupModelView, ContactModelView]
+
+class GroupMasterView(MasterDetailView):
+    datamodel = SQLAInterface(ContactGroup)
+    related_views = [ContactModelView]
+
+
+db.create_all()
+
+appbuilder.add_view(MyView, "Method1", category='My View')
+appbuilder.add_link("Method2", href='/myview/method2/john', category='My View')
+appbuilder.add_link("Method3", href='/myview/method3/john', category='My View')
+
 appbuilder.add_view(MyFormView, "My form View", icon="fa-group", label=_('My form View'),
                      category="My Forms", category_icon="fa-cogs")
 
-"""
-    Create your Views::
+appbuilder.add_view(GroupModelView,
+                    "List Groups",
+                    icon = "fa-folder-open-o",
+                    category = "Contacts",
+                    category_icon = "fa-envelope")
+appbuilder.add_view(ContactModelView,
+                    "List Contacts",
+                    icon = "fa-envelope",
+                    category = "Contacts")
 
+appbuilder.add_view(MultipleViewExp,
+                    "Multiple Views",
+                    icon="fa-envelope",
+                    category="Contacts")
 
-    class MyModelView(ModelView):
-        datamodel = SQLAInterface(MyModel)
-
-
-    Next, register your Views::
-
-
-    appbuilder.add_view(MyModelView, "My View", icon="fa-folder-open-o", category="My Category", category_icon='fa-envelope')
-
-
-    Application wide 404 error handler
-
-@appbuilder.app.errorhandler(404)
-def page_not_found(e):
-    return render_template('404.html', base_template=appbuilder.base_template, appbuilder=appbuilder), 404
-
-db.create_all()
-"""
+appbuilder.add_view(GroupMasterView,
+                    "Master View",
+                    icon="fa-envelope",
+                    category="Contacts")
